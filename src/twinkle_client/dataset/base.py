@@ -11,6 +11,7 @@
 
 from typing import Any, Callable, Dict, Type, Union
 from twinkle_client.http import http_post
+from twinkle_client.common.template_model_id import resolve_template_model_id
 from twinkle.dataset import Dataset
 from twinkle.dataset import DatasetMeta
 from twinkle.preprocessor import DataFilter
@@ -37,14 +38,21 @@ class Dataset(object):
 
     
     def set_template(self, template_func: Union[Template, Type[Template], str], **kwargs):
+        lookup_model_name = kwargs.pop('model_id', None)
+        if lookup_model_name and '://' in lookup_model_name:
+            lookup_model_name = lookup_model_name.split('://')[1]
+        model_id = resolve_template_model_id(lookup_model_name, None)
+        json_data = {
+            'processor_id': self.processor_id,
+            'function': 'set_template',
+            **{'template_func': template_func},
+        }
+        if model_id is not None:
+            json_data['model_id'] = model_id
+        json_data.update(kwargs)
         response = http_post(
             url=f'{self.server_url}/call',
-            json_data={
-                'processor_id': self.processor_id,
-                'function': 'set_template',
-                **{'template_func': template_func},
-                **kwargs
-            }
+            json_data=json_data
         )
         response.raise_for_status()
         return response.json()["result"]
